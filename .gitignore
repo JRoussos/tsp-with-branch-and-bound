@@ -1,0 +1,9 @@
+#Extentions
+*.pdf
+*.out
+
+#Folders
+/.vscode
+
+#Files
+tsp - Copy.c
