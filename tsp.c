@@ -199,7 +199,9 @@ void *thread_function(void *arguments){
     int keep_matrix[CITIES][CITIES];
     int lcb = args->least_cost_bound;
 
+
     // printf("least_cost_bound: %d\n", args->least_cost_bound);
+    // printf("thread_id: %d\n", args->thread_id);
 
     //reconstruct array
     for(int k=0; k<CITIES; k++){
@@ -319,19 +321,7 @@ void *thread_function(void *arguments){
 
 int do_it_with_threads(int number_of_threads, int matrix[CITIES][CITIES], int total_cost, int where_am_i){
     pthread_t threads[number_of_threads];
-    // struct timespec end;
-    struct thread_args t_arg;
-
-    t_arg.total_cost = total_cost;
-    t_arg.where_am_i = where_am_i;
-    t_arg.recurtion_times = 0;
-    t_arg.least_cost_bound = INF;
-
-    for(int i=0; i<CITIES; i++){
-        for(int k=0; k<CITIES; k++){
-            t_arg.matrix[i][k] = matrix[i][k];
-        }
-    }
+    struct thread_args *t_arg;
 
     int least_cost_bound = INF;
     int keep_node;
@@ -354,11 +344,29 @@ int do_it_with_threads(int number_of_threads, int matrix[CITIES][CITIES], int to
     for(int i=0; i<CITIES; i++){
         if(been_there[i] != 1){
             recurtion_times++;
-            t_arg.thread_id = i;
-            if (pthread_create(&threads[i], NULL, thread_function, &t_arg) != 0 ){
+            t_arg = malloc(sizeof(struct thread_args));
+            t_arg->thread_id = i;
+            
+            t_arg->total_cost = total_cost;
+            t_arg->where_am_i = where_am_i;
+            t_arg->recurtion_times = 0;
+            t_arg->least_cost_bound = INF;
+
+            for(int i=0; i<CITIES; i++){
+                for(int k=0; k<CITIES; k++){
+                    t_arg->matrix[i][k] = matrix[i][k];
+                }
+            }
+            
+            if (pthread_create(&threads[i], NULL, thread_function, (void *)t_arg) != 0 ){
                 perror("ERROR: Thread Creation\n");
                 exit(EXIT_FAILURE);
             }
+        }
+    }
+
+    for(int i=0; i<CITIES; i++){
+        if(been_there[i] != 1){
             if (pthread_join(threads[i], (void*)&t_out) != 0 ){
                 perror("ERROR: Thread Join\n");
                 exit(EXIT_FAILURE);
@@ -404,6 +412,7 @@ int main(int argc, char const *argv[]){
     int total_cost = 0;
 
     struct timespec start, end;
+    struct timespec t_start, t_end;
 
     //print the initial matrix
     printf("\nThe cost matrix is the following:\n\n");
@@ -511,16 +520,16 @@ int main(int argc, char const *argv[]){
 
     pos = 0; //zeroing the position to start counting again with the threads 
     memset(been_there, 0, sizeof(been_there)); //zeroing been_there array
-    clock_gettime(CLOCK_MONOTONIC, &start); //start the clock again for threads
+    clock_gettime(CLOCK_MONOTONIC, &t_start); //start the clock again for threads
     total_cost = do_it_with_threads(CITIES-1, reduced_matrix, keep_total_cost_for_threads, 0);
 
     printf("\ntotal travel cost with threads: %d\n", total_cost);
 
-    clock_gettime(CLOCK_MONOTONIC, &end); //stop the clock 
+    clock_gettime(CLOCK_MONOTONIC, &t_end); //stop the clock 
     // calculating the time it took to find the path and min cost recursively
-    time_lapsed = (end.tv_sec - start.tv_sec) * 1000000000;
-    time_lapsed = (time_lapsed + (end.tv_nsec - start.tv_nsec)) / 1000000000;
-    printf("time taken to calculate sortest path with %d threads: %f sec\n", CITIES-1, time_lapsed);
+    time_lapsed = (t_end.tv_sec - t_start.tv_sec) * 1000000000;
+    time_lapsed = (time_lapsed + (t_end.tv_nsec - t_start.tv_nsec)) / 1000000000;
+    printf("time taken to calculate sortest path with threads: %f sec\n", time_lapsed);
     
     return 0;
 }
