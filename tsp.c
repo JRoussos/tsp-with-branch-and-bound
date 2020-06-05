@@ -4,9 +4,13 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <string.h>
+#include <signal.h>
 
 #define CITIES 5
 #define INF 99
+
+pthread_mutex_t mutex;
+pthread_cond_t condition;
 
 struct thread_args{
     int matrix[CITIES][CITIES];
@@ -31,6 +35,8 @@ int cost_matrix[CITIES][CITIES] = {
     {19, 6, 18, INF, 3},
     {16, 4, 7, 16, INF}
 };
+
+int threads_free;
 
 //another matrix for validation of the algorithm. 
 //the cost should be 34 and the path 1-> 3 -> 4 -> 2 -> 5 -> 1
@@ -316,6 +322,8 @@ void *thread_function(void *arguments){
         }
     }
 
+    pthread_mutex_unlock(&mutex);
+    // pthread_cond_signal(&condition);
     pthread_exit(out);
 }
 
@@ -335,14 +343,31 @@ int do_it_with_threads(int number_of_threads, int matrix[CITIES][CITIES], int to
     travel_path[pos] = where_am_i+1;
     pos++;
 
+
     // printf("been there: ");
     // for(int i=0; i<CITIES; i++){
     //     printf("%d ", been_there[i]);
     // }
     // printf("\n");
 
+
+    //need a logic for choosing thread number and how to properly assign them to the cities
+    // printf("number_of_threads: %d\n", number_of_threads);
+    threads_free = number_of_threads;
+
     for(int i=0; i<CITIES; i++){
-        if(been_there[i] != 1){
+        // printf("threads_free: %d\n", threads_free);
+        if(threads_free < 1 && been_there[i] == 0){
+            pthread_mutex_lock(&mutex);
+            // pthread_cond_wait(&condition, &mutex);
+            // printf("i've been unlocked\n");
+            threads_free++;
+            // printf("threads_free: %d\n\n", threads_free);
+            // pthread_mutex_unlock(&mutex);
+        }   
+
+        if(been_there[i] == 0){
+            threads_free--;
             recurtion_times++;
             t_arg = malloc(sizeof(struct thread_args));
             t_arg->thread_id = i;
@@ -364,9 +389,10 @@ int do_it_with_threads(int number_of_threads, int matrix[CITIES][CITIES], int to
             }
         }
     }
+    
 
     for(int i=0; i<CITIES; i++){
-        if(been_there[i] != 1){
+        if(been_there[i] == 0){
             if (pthread_join(threads[i], (void*)&t_out) != 0 ){
                 perror("ERROR: Thread Join\n");
                 exit(EXIT_FAILURE);
@@ -384,6 +410,7 @@ int do_it_with_threads(int number_of_threads, int matrix[CITIES][CITIES], int to
                 }
             }
             free(t_out);
+            // threads_left++;
         }
     }
 
@@ -518,6 +545,7 @@ int main(int argc, char const *argv[]){
     time_lapsed = (time_lapsed + (end.tv_nsec - start.tv_nsec)) / 1000000000;
     printf("time taken to calculate sortest path recurively: %f sec\n\n", time_lapsed);
 
+    //4 threads
     pos = 0; //zeroing the position to start counting again with the threads 
     memset(been_there, 0, sizeof(been_there)); //zeroing been_there array
     clock_gettime(CLOCK_MONOTONIC, &t_start); //start the clock again for threads
@@ -529,7 +557,35 @@ int main(int argc, char const *argv[]){
     // calculating the time it took to find the path and min cost recursively
     time_lapsed = (t_end.tv_sec - t_start.tv_sec) * 1000000000;
     time_lapsed = (time_lapsed + (t_end.tv_nsec - t_start.tv_nsec)) / 1000000000;
-    printf("time taken to calculate sortest path with threads: %f sec\n", time_lapsed);
+    printf("time taken to calculate sortest path with 4 threads: %f sec\n", time_lapsed);
+
+    //3 threads
+    pos = 0; //zeroing the position to start counting again with the threads 
+    memset(been_there, 0, sizeof(been_there)); //zeroing been_there array
+    clock_gettime(CLOCK_MONOTONIC, &t_start); //start the clock again for threads
+    total_cost = do_it_with_threads(3, reduced_matrix, keep_total_cost_for_threads, 0);
+
+    printf("\ntotal travel cost with threads: %d\n", total_cost);
+
+    clock_gettime(CLOCK_MONOTONIC, &t_end); //stop the clock 
+    // calculating the time it took to find the path and min cost recursively
+    time_lapsed = (t_end.tv_sec - t_start.tv_sec) * 1000000000;
+    time_lapsed = (time_lapsed + (t_end.tv_nsec - t_start.tv_nsec)) / 1000000000;
+    printf("time taken to calculate sortest path with 3 threads: %f sec\n", time_lapsed);
+
+    //2 threads
+    pos = 0; //zeroing the position to start counting again with the threads 
+    memset(been_there, 0, sizeof(been_there)); //zeroing been_there array
+    clock_gettime(CLOCK_MONOTONIC, &t_start); //start the clock again for threads
+    total_cost = do_it_with_threads(2, reduced_matrix, keep_total_cost_for_threads, 0);
+
+    printf("\ntotal travel cost with threads: %d\n", total_cost);
+
+    clock_gettime(CLOCK_MONOTONIC, &t_end); //stop the clock 
+    // calculating the time it took to find the path and min cost recursively
+    time_lapsed = (t_end.tv_sec - t_start.tv_sec) * 1000000000;
+    time_lapsed = (time_lapsed + (t_end.tv_nsec - t_start.tv_nsec)) / 1000000000;
+    printf("time taken to calculate sortest path with 2 threads: %f sec\n", time_lapsed);
     
     return 0;
 }
